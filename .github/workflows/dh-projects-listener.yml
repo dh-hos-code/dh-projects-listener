@@ -1,0 +1,84 @@
+name: dh-projects-listener
+on:
+  workflow_dispatch:
+  push:
+  schedule:
+    - cron: "30 */5 * * *"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: ${{ github.workflow }}
+    env:
+      OAESFILE: ${{ secrets.OAESFILE }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_TOKEN: ${{ secrets.ISSUE_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # Bạn có thể thay đổi phiên bản Node.js nếu cần
+
+      - name: Git ls-tree
+        if: always()
+        shell: pwsh
+        run: ./.github/scripts-yml/git-ls-tree.ps1
+
+      - name: Decrypt oAESFile
+        shell: pwsh
+        run: |
+          if (Test-Path "./oAESFile.js") {
+            node ./oAESFile.js --de $env:OAESFILE ./;
+            git log -1;
+          }
+
+      - name: Git ls-tree
+        if: always()
+        shell: pwsh
+        run: ./.github/scripts-yml/git-ls-tree.ps1
+
+      - name: Execute ./dist-dh-issues-o-dh-009.js by NodeJS
+        shell: bash
+        run: |
+          node ./dist-dh-issues-o-dh-009.js
+
+      - name: Save GitHub and other contexts to files
+        if: always()
+        shell: pwsh
+        run: |
+          # Tạo thư mục logs nếu chưa tồn tại
+          if (-not (Test-Path -Path './contexts')) { New-Item -ItemType Directory -Path './contexts' }
+          # Ghi các context hợp lệ vào file
+          '${{ toJson(github) }}' | Out-File -FilePath ./contexts/github-context.json -Encoding utf8
+          '${{ toJson(env) }}' | Out-File -FilePath ./contexts/env-context.json -Encoding utf8
+          '${{ toJson(vars) }}' | Out-File -FilePath ./contexts/vars-context.json -Encoding utf8
+          '${{ toJson(job) }}' | Out-File -FilePath ./contexts/job-context.json -Encoding utf8
+          '${{ toJson(runner) }}' | Out-File -FilePath ./contexts/runner-context.json -Encoding utf8
+          '${{ toJson(strategy) }}' | Out-File -FilePath ./contexts/strategy-context.json -Encoding utf8
+          '${{ toJson(matrix) }}' | Out-File -FilePath ./contexts/matrix-context.json -Encoding utf8
+          '${{ toJson(needs) }}' | Out-File -FilePath ./contexts/needs-context.json -Encoding utf8
+          '${{ toJson(inputs) }}' | Out-File -FilePath ./contexts/inputs-context.json -Encoding utf8
+          '${{ toJson(steps) }}' | Out-File -FilePath ./contexts/inputs-steps.json -Encoding utf8
+          Get-ChildItem Env: | Out-File -FilePath ./contexts/environment-variables.txt -Append
+          $jsonSteps = '${{ toJson(secrets) }}'
+          $jsonSteps | Out-File -FilePath ./contexts/secrets.txt -Append
+          $jsonSteps = '${{ toJson(steps) }}'
+          $jsonSteps | Out-File -FilePath ./contexts/steps.txt -Append
+
+      - name: Git ls-tree
+        if: always()
+        shell: pwsh
+        run: ./.github/scripts-yml/git-ls-tree.ps1
+
+      - name: Upload build artifacts v4
+        if: always() # Luôn luôn chạy step này, dù các step trước có lỗi
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.workflow }}-artifacts-${{ github.run_id }}
+          path: |
+            logs
+            contexts
+            RtdbDataChanged
+          retention-days: 10 # Định nghĩa thời gian tồn tại (ở đây là 30 ngày)
+          compression-level: 9 # maximum compression
