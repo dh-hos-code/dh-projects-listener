@@ -12,6 +12,7 @@ jobs:
       OAESFILE: ${{ secrets.OAESFILE }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE_TOKEN: ${{ secrets.ISSUE_TOKEN }}
+      GH_DH_BOT_00: ${{ secrets.GH_DH_BOT_00 }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
